@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #121212;
+            color: #fff;
+            flex-direction: column;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+            color: #f4f4f4;
+        }
+
+        #score {
+            font-size: 22px;
+            margin: 10px 0;
+            color: #bbb;
+        }
+
+        #gameCanvas {
+            border: 3px solid #444;
+            background-color: #1e1e1e;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        .button {
+            background-color: #444;
+            color: #fff;
+            border: 1px solid #666;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            margin-top: 20px;
+        }
+
+        .button:hover {
+            background-color: #555;
+        }
+
+        .button:active {
+            transform: scale(0.98);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .fade-in {
+            opacity: 0;
+            animation: fadeIn 0.5s forwards;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Snake Game</h1>
+    <div id="score" class="fade-in">Score: 0</div>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <button id="restartButton" class="button hidden">Restart</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scale = 20;
+        const rows = canvas.height / scale;
+        const columns = canvas.width / scale;
+        const restartButton = document.getElementById('restartButton');
+        const scoreElement = document.getElementById('score');
+
+        let snake;
+        let apple;
+        let score;
+        let dx;
+        let dy;
+        let changingDirection;
+        let gameOverFlag = false;
+        let lastRenderTime = 0;
+        let gameSpeed = 10;
+
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        document.addEventListener('keydown', changeDirection);
+
+        // Handle swipe gesture for mobile devices
+        canvas.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            touchStartX = touch.pageX;
+            touchStartY = touch.pageY;
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            const touch = e.changedTouches[0];
+            const touchEndX = touch.pageX;
+            const touchEndY = touch.pageY;
+
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+
+            // Swipe detection
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (deltaX > 0) {
+                    changeDirection({ keyCode: 39 }); // Right
+                } else {
+                    changeDirection({ keyCode: 37 }); // Left
+                }
+            } else {
+                if (deltaY > 0) {
+                    changeDirection({ keyCode: 40 }); // Down
+                } else {
+                    changeDirection({ keyCode: 38 }); // Up
+                }
+            }
+        });
+
+        // Initial game setup
+        function init() {
+            snake = [{ x: 10, y: 10 }];
+            apple = randomApple();
+            score = 0;
+            dx = scale * 1;  // Moving right initially
+            dy = 0;
+            changingDirection = false;
+            gameOverFlag = false;
+            restartButton.classList.add('hidden');
+            scoreElement.classList.add('fade-in');
+            requestAnimationFrame(game);
+        }
+
+        // Main game loop with smooth movement
+        function game(currentTime) {
+            if (gameOver()) return gameOverHandler();
+
+            const deltaTime = currentTime - lastRenderTime;
+            if (deltaTime < 1000 / gameSpeed) {
+                requestAnimationFrame(game);
+                return;
+            }
+            lastRenderTime = currentTime;
+
+            changingDirection = false;
+            clearCanvas();
+            drawApple();
+            moveSnake();
+            drawSnake();
+            updateScore();
+
+            requestAnimationFrame(game);
+        }
+
+        // Clear the canvas
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Draw the snake
+        function drawSnake() {
+            snake.forEach((segment, index) => {
+                ctx.fillStyle = index === 0 ? '#8aff80' : '#33cc33';  // Head is light green, body is darker
+                ctx.fillRect(segment.x * scale, segment.y * scale, scale, scale);
+            });
+        }
+
+        // Move the snake
+        function moveSnake() {
+            const head = { x: snake[0].x + dx / scale, y: snake[0].y + dy / scale };
+            snake.unshift(head);
+
+            if (head.x === apple.x && head.y === apple.y) {
+                score++;
+                apple = randomApple();
+            } else {
+                snake.pop();
+            }
+        }
+
+        // Change snake's direction based on keyboard input or swipe
+        function changeDirection(event) {
+            if (changingDirection || gameOverFlag) return;
+            changingDirection = true;
+
+            const keyPressed = event.keyCode;
+
+            if (keyPressed === 37 && dx === 0) {
+                dx = -scale;
+                dy = 0;
+            }
+            if (keyPressed === 38 && dy === 0) {
+                dy = -scale;
+                dx = 0;
+            }
+            if (keyPressed === 39 && dx === 0) {
+                dx = scale;
+                dy = 0;
+            }
+            if (keyPressed === 40 && dy === 0) {
+                dy = scale;
+                dx = 0;
+            }
+        }
+
+        // Generate random position for the apple
+        function randomApple() {
+            let x = Math.floor(Math.random() * columns);
+            let y = Math.floor(Math.random() * rows);
+            return { x, y };
+        }
+
+        // Draw the apple
+        function drawApple() {
+            ctx.fillStyle = '#ff6666';  // Red apple
+            ctx.fillRect(apple.x * scale, apple.y * scale, scale, scale);
+        }
+
+        // Check if the game is over
+        function gameOver() {
+            const head = snake[0];
+            if (head.x < 0 || head.x >= columns || head.y < 0 || head.y >= rows) return true;
+            for (let i = 1; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) return true;
+            }
+            return false;
+        }
+
+        // Handle the game over scenario
+        function gameOverHandler() {
+            gameOverFlag = true;
+            restartButton.classList.remove('hidden');
+            restartButton.classList.add('fade-in');
+        }
+
+        // Update the score display
+        function updateScore() {
+            scoreElement.textContent = `Score: ${score}`;
+        }
+
+        // Restart the game
+        restartButton.addEventListener('click', () => {
+            score = 0;
+            scoreElement.textContent = `Score: ${score}`;
+            scoreElement.classList.add('fade-in');
+            init();
+        });
+
+        // Start the game
+        init();
+    </script>
+</body>
+</html>
